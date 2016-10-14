@@ -18,6 +18,22 @@ class UnitTestReporter(S3LogUploadMixin, SlackReportMixin, TestReporterBase):
         self.sha = data['sha']
         self.short_sha = self.sha[:7]
 
+    def mark_status(self, state, desc, target_url):
+        if not self.repo:
+            return
+        result = self.repo.create_status(
+            sha=self.sha, state=state,
+            description=desc,
+            context=self.context,
+            target_url=target_url
+        )
+        if result:
+            msg = "Marked '{0}' status for commit {1}".format(state, self.short_sha)
+            self.logger.info(msg)
+        else:
+            msg = "Error on creating status for commit {}".format(self.short_sha)
+            self.logger.error(msg)
+
     def test_commands(self):
         case_name = 'commit {}'.format(self.short_sha)
         cmd = sys.executable + ' manage.py test --noinput ' \

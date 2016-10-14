@@ -27,6 +27,7 @@ def parse_test_result(output):
 def summarize_result(test_result) -> (str, str):
     '''
     Summarize the result and return (title, summary) messages as strings.
+    It is useful to construct human-friendly descriptions for test results.
     '''
     if test_result is None:
         return 'Ough!', 'No test results.'
@@ -104,7 +105,7 @@ class TestReporterBase:
         self.logger.info("On branch '{}'".format(branch))
         return branch
 
-    def mark_status(self, state, test_result=None, preparing=False):
+    def _mark_status(self, state, test_result=None, preparing=False):
         target_url = None
         if state == 'pending':
             if preparing:
@@ -117,35 +118,33 @@ class TestReporterBase:
         else:
             self.logger.error("Invalid status state: {}".format(state))
             return
+        self.mark_status(state, desc, target_url)
 
-        if self.repo:
-            result = self.repo.create_status(
-                sha=self.sha, state=state,
-                description=desc,
-                context=self.context,
-                target_url=target_url
-            )
-            if result:
-                msg = "Marked '{0}' status for commit {1}".format(state, self.short_sha)
-                self.logger.info(msg)
-            else:
-                msg = "Error on creating status for commit {}".format(self.short_sha)
-                self.logger.error(msg)
+    def mark_status(self, state, desc, target_url):
+        '''
+        Report the progress of the currently running test suite.
+        If your reporter works in a per-commit basis,
+        this is where to annotate commits in your VCS.
+        Otherwise, you may just leave it as an empty method
+        by not overriding it.
+        '''
+        pass
 
     def add_result(self, case_name, test_result):
         '''
         Store the given test result (may be None) in the format(s) you want.
+        test_result may be None.
         '''
         pass
 
     def flush_results(self):
         '''
-        Make a final report on test results and send it to any location you want.
+        Make a final report from the stored test results and send it.
         '''
         pass
 
     async def run(self, cmd):
-        self.mark_status('pending', preparing=True)
+        self._mark_status('pending', preparing=True)
         self.logger.info("Start testing procedure at {} ...".format(datetime.now()))
 
         for case_name, ref, cmd in self.test_commands():
@@ -165,11 +164,11 @@ class TestReporterBase:
 
             test_result = parse_test_result(output)
             if "Error:" in output:
-                self.mark_status('error', test_result)
+                self._mark_status('error', test_result)
             elif "FAIL:" in output:
-                self.mark_status('failure', test_result)
+                self._mark_status('failure', test_result)
             else:
-                self.mark_status('success', test_result)
+                self._mark_status('success', test_result)
 
             # Add reports.
             # TODO: self.comment_issue(466, test_result, err_prefix="FUNCTIONAL_TEST:\n")
