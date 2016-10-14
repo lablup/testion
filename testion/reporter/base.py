@@ -83,7 +83,8 @@ class TestReporterBase:
         self.gh = github3.login(user, token)
         self.repo = self.gh.repository(self.target_user, self.target_repo)
 
-    def run_command(self, cmd, verbose=False):
+    async def run_command(self, cmd, verbose=False):
+        # TODO: change to asyncio.subprocess
         p = subprocess.run(cmd, shell=True,
                            stdout=subprocess.PIPE,
                            stderr=subprocess.STDOUT if verbose else subprocess.PIPE)
@@ -95,6 +96,7 @@ class TestReporterBase:
 
     def checkout_to_branch(self, name):
         self.logger.info("Checking out to '{}' branch".format(name))
+        # TODO: change to pygit2 native methods
         self.run_command("git checkout {}".format(name), verbose=True)
 
         branch, _ = self.run_command("git branch | grep \* | cut -d ' ' -f2")
@@ -129,7 +131,7 @@ class TestReporterBase:
             else:
                 self.logger.error("Error on creating status for commit {}".format(self.sha))
 
-    def add_result(self, test_result):
+    def add_result(self, case_name, test_result):
         '''
         Store the given test result (may be None) in the format(s) you want.
         '''
@@ -154,7 +156,7 @@ class TestReporterBase:
             try:
                 # Run the test suite!
                 self.logger.info('Running tests at {}...'.format(datetime.now()))
-                output, _ = self.run_command(cmd, verbose=True)
+                output, _ = await self.run_command(cmd, verbose=True)
                 self.logger.info('Test finished at {}'.format(datetime.now()))
             finally:
                 # TODO: Clean up the cloned repository.
