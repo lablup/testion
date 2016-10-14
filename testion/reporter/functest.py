@@ -13,7 +13,7 @@ def pid_of(name):
 
 
 class FunctionalTestReporter(
-        SlackReportMixin, GHIssueCommentMixin, S3LogUploadMixin,
+        S3LogUploadMixin, SlackReportMixin, GHIssueCommentMixin,
         TestReporterBase):
 
     context = 'ci/testion/functional-test'
@@ -78,7 +78,7 @@ class FunctionalTestReporter(
                 self.branch = new_branch
 
                 cmd = sys.executable + " manage.py test --noinput functional_tests"
-                yield 'branch {}'.format(new_branch), cmd
+                yield 'branch {}'.format(new_branch), new_branch, cmd
 
         finally:
             self.terminate_selenium_server()

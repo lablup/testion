@@ -5,7 +5,7 @@ from .base import TestReporterBase
 from .mixins import SlackReportMixin, S3LogUploadMixin
 
 
-class UnitTestReporter(SlackReportMixin, S3LogUploadMixin, TestReporterBase):
+class UnitTestReporter(S3LogUploadMixin, SlackReportMixin, TestReporterBase):
 
     context = 'ci/testion/unit-test'
     test_type = 'unit_test'
@@ -22,5 +22,5 @@ class UnitTestReporter(SlackReportMixin, S3LogUploadMixin, TestReporterBase):
         case_name = 'commit {}'.format(self.short_sha)
         cmd = sys.executable + ' manage.py test --noinput ' \
               + '`ls -d */ | egrep -v "^functional_tests/"`'
-        yield case_name, cmd
+        yield case_name, self.sha, cmd
 
