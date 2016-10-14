@@ -6,13 +6,13 @@ from aiohttp import web
 import uvloop
 
 from .exceptions import UnsupportedEventError
-from .reporter.unittest import UnitTestReporter 
-from .reporter.functest import FunctionalTestReporter 
+from .reporter.unittest import UnitTestReporter
+from .reporter.functest import SeleniumFunctionalTestReporter
 
 
 reporter_map = {
     'unit': UnitTestReporter,
-    'func': FunctionalTestReporter,
+    'slfunc': SeleniumFunctionalTestReporter,
 }
 
 
@@ -30,7 +30,7 @@ async def github_webhook(request):
     except json.decoder.JSONDecodeError:
         return web.Response(status=400, text='Invalid JSON.')
     print(data)
- 
+
     try:
         reporter = reporter_cls(ev_type, data)
         await reporter.run()

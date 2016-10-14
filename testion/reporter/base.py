@@ -105,31 +105,32 @@ class TestReporterBase:
         return branch
 
     def mark_status(self, state, test_result=None, preparing=False):
-        # Set description text
+        target_url = None
         if state == 'pending':
             if preparing:
                 desc = "Preparing tests..."
             else:
-                desc = "Running tests on branch {}...".format(self.branch)
+                desc = "Running tests..."
         elif state in ('error', 'success', 'failure'):
+            target_url = self.log_link
             _, desc = summarize_result(test_result)
         else:
             self.logger.error("Invalid status state: {}".format(state))
             return
 
-        # Set the details URL
-        target_url = self.log_link if state != "pending" else None
-
-        # Create status for current commit
         if self.repo:
             result = self.repo.create_status(
-                sha=self.sha, state=state, description=desc,
-                context=self.context, target_url=target_url
+                sha=self.sha, state=state,
+                description=desc,
+                context=self.context,
+                target_url=target_url
             )
             if result:
-                self.logger.info("Marked '{0}' status for commit {1}".format(state, self.sha))
+                msg = "Marked '{0}' status for commit {1}".format(state, self.short_sha)
+                self.logger.info(msg)
             else:
-                self.logger.error("Error on creating status for commit {}".format(self.sha))
+                msg = "Error on creating status for commit {}".format(self.short_sha)
+                self.logger.error(msg)
 
     def add_result(self, case_name, test_result):
         '''

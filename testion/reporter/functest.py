@@ -39,7 +39,7 @@ def selenium_server(logger):
         logger.info("Selenium server terminated")
 
 
-class FunctionalTestReporter(
+class SeleniumFunctionalTestReporter(
         S3LogUploadMixin, SlackReportMixin, GHIssueCommentMixin,
         TestReporterBase):
 
@@ -53,11 +53,9 @@ class FunctionalTestReporter(
 
     def get_test_branches(self):
         """
-        Get list of branches which have commits from yesterday
+        Find all branches which have commits from yesterday.
         """
         test_branches = set()
-
-        # Find all branches which have commits yesterday
         commits, stderr = self.run_command("git rev-list HEAD --all --after='yesterday'")
         for commit in commits.split():
             branches, stdout = self.run_command("git branch --contains {} --sort=-committerdate".format(commit))
@@ -65,7 +63,6 @@ class FunctionalTestReporter(
                 if branch != "*":
                     test_branches.add(branch)
                     break
-
         return list(test_branches)
 
     def test_commands(self):
@@ -73,17 +70,9 @@ class FunctionalTestReporter(
         test_branches = self.get_test_branches()
         self.logger.info('Branches which have commits yesterday:\n' +
                          '\n'.join(' - {}'.format(name) for name in test_branches))
-        new_branch = self.branch
-        try:
-            self.prepare_selenium_server()
-            for branch in test_branches:
-                new_branch = self.checkout_to_branch(branch)
-                if branch != new_branch:
-                    continue  # did not change branch (stash and stash pop needed?)
-                self.branch = new_branch
-                with selenium_server(self.logger):
-                    cmd = sys.executable + " manage.py test --noinput functional_tests"
-                    yield 'branch {}'.format(new_branch), new_branch, cmd
-        finally:
-            self.terminate_selenium_server()
+        for branch in test_branches:
+            self.checkout_to_branch(branch)
+            with selenium_server(self.logger):
+                cmd = sys.executable + " manage.py test --noinput functional_tests"
+                yield 'branch {}'.format(branch), branch, cmd
 
