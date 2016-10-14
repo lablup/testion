@@ -1,6 +1,7 @@
 import sys
 
 from .base import TestReporterBase
+from .mixins import SlackReportMixin, GHIssueCommentMixin, S3LogUploadMixin
 
 
 def pid_of(name):
@@ -11,17 +12,21 @@ def pid_of(name):
         return None
 
 
-class FunctionalTestReporter(TestReporterBase):
+class FunctionalTestReporter(
+        SlackReportMixin, GHIssueCommentMixin, S3LogUploadMixin,
+        TestReporterBase):
 
     context = 'ci/testion/functional-test'
     test_type = 'functional_test'
 
-    def __init__(self):
-        super().__init__()
-        self.branch = 'master'
+    gh_issue_num = 466
+
+    def __init__(self, ev_type, data):
+        super().__init__(ev_type, data)
 
     def get_test_branches(self):
-        """ Get list of branches which have commits from yesterday
+        """
+        Get list of branches which have commits from yesterday
         """
         test_branches = set()
 

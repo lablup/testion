@@ -26,7 +26,6 @@ async def github_webhook(request):
 
     ev_type = request.headers.get('X-GitHub-Event', 'push')
     try:
-        
         data = await request.json()
     except json.decoder.JSONDecodeError:
         return web.Response(status=400, text='Invalid JSON.')
