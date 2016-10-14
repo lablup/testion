@@ -154,7 +154,6 @@ class TestReporterBase:
             # TODO: Clone and checkout to the given reference
 
             try:
-                # Run the test suite!
                 self.logger.info('Running tests at {}...'.format(datetime.now()))
                 output, _ = await self.run_command(cmd, verbose=True)
                 self.logger.info('Test finished at {}'.format(datetime.now()))
@@ -169,9 +168,6 @@ class TestReporterBase:
                 self._mark_status('failure', test_result)
             else:
                 self._mark_status('success', test_result)
-
-            # Add reports.
-            # TODO: self.comment_issue(466, test_result, err_prefix="FUNCTIONAL_TEST:\n")
             self.add_result(test_result)
 
         if new_branch != "master":

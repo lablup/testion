@@ -66,7 +66,6 @@ class SeleniumFunctionalTestReporter(
         return list(test_branches)
 
     def test_commands(self):
-        # Get all branches which have commits yesterday
         test_branches = self.get_test_branches()
         self.logger.info('Branches which have commits yesterday:\n' +
                          '\n'.join(' - {}'.format(name) for name in test_branches))
