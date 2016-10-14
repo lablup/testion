@@ -56,8 +56,10 @@ class SeleniumFunctionalTestReporter(
         Find all branches which have commits from yesterday.
         """
         test_branches = set()
+        # TODO: change to pygit2
         commits, stderr = self.run_command("git rev-list HEAD --all --after='yesterday'")
         for commit in commits.split():
+            # TODO: change to pygit2
             branches, stdout = self.run_command("git branch --contains {} --sort=-committerdate".format(commit))
             for branch in branches.split():
                 if branch != "*":

@@ -147,19 +147,17 @@ class TestReporterBase:
         self._mark_status('pending', preparing=True)
         self.logger.info("Start testing procedure at {} ...".format(datetime.now()))
 
+        # TODO: Clone the repo.
+
         for case_name, ref, cmd in self.test_commands():
 
             output = None
 
-            # TODO: Clone and checkout to the given reference
+            # TODO: Checkout to the given reference
 
-            try:
-                self.logger.info('Running tests at {}...'.format(datetime.now()))
-                output, _ = await self.run_command(cmd, verbose=True)
-                self.logger.info('Test finished at {}'.format(datetime.now()))
-            finally:
-                # TODO: Clean up the cloned repository.
-                pass
+            self.logger.info('Running tests at {}...'.format(datetime.now()))
+            output, _ = await self.run_command(cmd, verbose=True)
+            self.logger.info('Test finished at {}'.format(datetime.now()))
 
             test_result = parse_test_result(output)
             if "Error:" in output:
@@ -170,10 +168,9 @@ class TestReporterBase:
                 self._mark_status('success', test_result)
             self.add_result(test_result)
 
-        if new_branch != "master":
-            self.checkout_to_branch("master")
-        self.logger.info("Finished at {}\n".format(datetime.now()))
+        # TODO: Destroy the working coppy and cloned repo.
 
+        self.logger.info("Finished at {}\n".format(datetime.now()))
         self.flush_results()
 
     def test_commands(self):
