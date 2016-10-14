@@ -1,0 +1,2 @@
+class UnsupportedEventError(RuntimeError):
+    pass
