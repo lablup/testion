@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import re
 import tempfile
+import uuid
 
 import github3
 import pygit2
@@ -66,19 +67,18 @@ class TestReporterBase:
         # Set the log file name
         here = Path(__file__).parent
         test_date = datetime.today().strftime("%Y%m%d")
-        if self.test_type == "functional_test":
-            suffix = datetime.now().strftime("%H:%M:%S")
-        else:
-            suffix = self.sha
-        log_fname = "{0}-{1}.txt".format(self.test_type, suffix)
+        test_time = datetime.now().strftime("%H%M%S")
+        test_id = uuid.uuid4().hex
+        log_fname = "{}-{}-{}.txt".format(self.test_type, test_time, test_id)
 
         # Set paths to store logs
         log_path = here.parent / 'log' / test_date
         log_path.mkdir(parents=True, exist_ok=True)
         self.log_file = str(log_path / log_fname)
-        self.s3_dest  = "s3://lablup-testion/{}/{}".format(test_date, log_fname)
-        self.log_link = "https://s3.ap-northeast-2.amazonaws.com/lablup-testion/{}/{}" \
-                        .format(test_date, log_fname)
+        self.s3_dest  = "s3://lablup-testion/{}/{}/{}{}" \
+                        .format(test_date, self.target_user, self.target_repo, log_fname)
+        self.log_link = "https://s3.ap-northeast-2.amazonaws.com/lablup-testion/{}/{}/{}/{}" \
+                        .format(test_date, self.target_user, self.targeT_repo, log_fname)
 
         # Set up the logger
         logger = logging.getLogger(self.test_type)
