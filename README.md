@@ -13,6 +13,12 @@ manually install `github3.py` package using pip and retry.
 There is a temporary issue due to renaming of `uritemplate` package
 which is not handeld in the stable version of `github3.py` package.
 
+If you encounter errors like:
+`Failed to resolve address for https: Name or service not known`
+then your libgit2 installation does not support SSL.
+In Debian Linux, you need to compile libgit2 manually to resolve
+this issue due to [OpenSSL license conflicts](https://github.com/libgit2/pygit2/issues/644).
+
 ## Configuration
 
 Testion requires the following environment variables:
