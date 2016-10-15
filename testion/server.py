@@ -29,7 +29,6 @@ async def github_webhook(request):
         data = await request.json()
     except json.decoder.JSONDecodeError:
         return web.Response(status=400, text='Invalid JSON.')
-    print(data)
 
     try:
         reporter = reporter_cls(ev_type, data)

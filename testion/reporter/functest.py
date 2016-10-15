@@ -3,6 +3,8 @@ import subprocess
 import sys
 import time
 
+import pygit2
+
 from .base import TestReporterBase
 from .mixins import SlackReportMixin, GHIssueCommentMixin, S3LogUploadMixin
 
@@ -54,24 +56,34 @@ class SeleniumFunctionalTestReporter(
 
     def get_recently_updated_branches(self):
         """
-        Find all branches which have commits from yesterday.
+        Find all branches which have new commits within last 24 hours.
         """
         assert self.local_repo is not None
+        # Since we have just cloned the repo recently (at the beginning of test),
+        # we don't have to fetch again here.
         branches = []
-
-        all_branches = self.local_repo.listall_branches()
-        now = time.time()  # TODO: timezone check?
+        branch_heads = set()  # to skip identical (merged or local==remote) branches
+        all_branches = self.local_repo.listall_branches(pygit2.GIT_BRANCH_LOCAL |
+                                                        pygit2.GIT_BRANCH_REMOTE)
+        now = time.time()  # in UTC
         for branch in all_branches:
+            if branch.endswith('/HEAD'):
+                continue
+            has_recent_commits = False
             branch_head = self.local_repo.revparse_single(branch)
             for commit in self.local_repo.walk(branch_head.hex, pygit2.GIT_SORT_TIME):
-                if commit.commit_time >= now - 86400:
-                    branches.append(branch)
+                if commit.commit_time < now - 86400:
                     break
+                else:
+                    has_recent_commits = True
+            if has_recent_commits and branch_head.hex not in branch_heads:
+                branches.append(branch)
+                branch_heads.add(branch_head.hex)
         return branches
 
     def test_commands(self, tmpdir):
         test_branches = self.get_recently_updated_branches()
-        self.logger.info('Branches which have commits yesterday:\n' +
+        self.logger.info('Non-identical branches with new commits within last 24 hours:\n' +
                          '\n'.join(' - {}'.format(name) for name in test_branches))
         for branch in test_branches:
             with selenium_server(self.logger):

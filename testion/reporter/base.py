@@ -14,6 +14,9 @@ import pygit2
 
 TestResult = namedtuple('TestResult', 'num_tests num_success num_fails')
 
+_test_cond = None
+_num_active_tests = 0
+
 
 def parse_test_result(output):
     if output is None:
@@ -50,10 +53,14 @@ class TestReporterBase:
     target_user = "lablup"
     target_repo = "neumann"
 
-
     def __init__(self, ev_type, data):
+        global _test_cond
+
         self.gh_user = os.environ['GH_USERNAME']
         self.gh_token = os.environ['GH_TOKEN']
+
+        if _test_cond is None:
+            _test_cond = asyncio.Condition()
 
         # Set the log file name
         here = Path(__file__).parent
@@ -88,22 +95,23 @@ class TestReporterBase:
         self.remote_repo = self.remote_gh.repository(self.target_user, self.target_repo)
 
     async def run_command(self, cmd, verbose=False):
-        p = asyncio.create_subprocess_shell(
-            cmd, stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT)
-        stdout, _ = p.communicate()
+        p = await asyncio.create_subprocess_shell(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT  # stderr is merged with stdout
+        )
+        stdout, _ = await p.communicate()
         stdout = stdout.decode()
-        if verbose:  # stderr is merged with stdout
-            self.logger.info(stdout)
+        if verbose:
+            self.logger.info('>>> {}'.format(cmd))
+            printed_stdout = stdout + '' if stdout.endswith('\n') else '\n'
+            self.logger.info('---\n{}---'.format(printed_stdout))
         return stdout.strip()
 
-    def _mark_status(self, state, test_result=None, preparing=False):
+    def _mark_status(self, state, test_result=None, msg=''):
         target_url = None
         if state == 'pending':
-            if preparing:
-                desc = "Preparing tests..."
-            else:
-                desc = "Running tests..."
+            desc = msg
         elif state in ('error', 'success', 'failure'):
             target_url = self.log_link
             _, desc = summarize_result(test_result)
@@ -136,11 +144,25 @@ class TestReporterBase:
         pass
 
     async def run(self, cmd):
-        self._mark_status('pending', preparing=True)
+        global _test_cond, _num_active_tests
+
+        self._mark_status('pending', msg='Preparing tests...')
         self.logger.info("Start testing procedure at {} ...".format(datetime.now()))
 
-        with tempfile.TemporaryDirectory() as tmpdir:
+        await _test_cond.acquire()
+        while _num_active_tests > 0:
+            _test_cond.wait()
+            if _num_active_tests > 0:
+                self._mark_Status('pending', msg='Waiting for other tests to finish...')
+        _num_active_tests += 1
+        _test_cond.release()
 
+        with tempfile.TemporaryDirectory() as tmpdir:
+            self._mark_status('pending', msg='Running tests...')
+
+            os.chdir(tmpdir)
+
+            # Clone the repository.
             creds = pygit2.UserPass(self.gh_user, self.gh_token)
             callbacks = pygit2.RemoteCallbacks(credentials=creds)
             repo_url = 'https://github.com/{}/{}.git' \
@@ -148,9 +170,12 @@ class TestReporterBase:
             self.local_repo = pygit2.clone_repository(repo_url, tmpdir,
                                                       callbacks=callbacks)
 
-            for case_name, ref, cmd in self.test_commands(tmpdir):
+            case_idx = -1
+            for case_idx, (case_name, ref, cmd) in enumerate(self.test_commands(tmpdir)):
 
-                self.local_repo.checkout(ref)
+                co_strategy = pygit2.GIT_CHECKOUT_FORCE \
+                              | pygit2.GIT_CHECKOUT_REMOVE_UNTRACKED
+                self.local_repo.checkout(ref, strategy=co_strategy)
                 msg = 'Checked out to {}'.format(self.head.target[:7])
                 if not self.local_repo.head_is_detached:
                     self.branch = self.local_repo.head.shorthand
@@ -159,11 +184,12 @@ class TestReporterBase:
                     self.branch = None
                     msg += " (detached)".format(self.branch)
                 self.logger.info(msg)
-                os.chdir(tmpdir)
 
-                self.logger.info('=== Test started at {} ==='.format(datetime.now()))
+                self.logger.info('=== Test[{}] started at {} ===' \
+                                 .format(case_idx, datetime.now()))
                 output = await self.run_command(cmd, verbose=True)
-                self.logger.info('=== Test finished at {} ==='.format(datetime.now()))
+                self.logger.info('=== Test[{}] finished at {} ===' \
+                                 .format(case_idx, datetime.now()))
 
                 test_result = parse_test_result(output)
                 if "Error:" in output:
@@ -174,11 +200,18 @@ class TestReporterBase:
                     self._mark_status('success', test_result)
                 self.add_result(test_result)
 
-            # TODO: handle when there is no test cases
+            if case_idx == -1:
+                self.logger.info('No test commands executed.')
+                self._mark_status('success', None)
 
-        self.local_repo = None
-        self.logger.info("Finished at {}\n".format(datetime.now()))
-        self.flush_results()
+            self.local_repo = None
+            self.logger.info("Finished at {}\n".format(datetime.now()))
+            self.flush_results()
+
+        await _test_cond.acquire()
+        _num_active_tests -= 1
+        _test_cond.notify()
+        _test_cond.release()
 
     def test_commands(self, tmpdir):
         '''

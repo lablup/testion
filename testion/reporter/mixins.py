@@ -51,6 +51,13 @@ class SlackReportMixin:
             text = '[{}/{}] We have <{}|a new {} report>.' \
                    .format(self.target_user, self.target_repo,
                            self.log_link, self.test_type.replace('_', ' '))
+            if not self.slack_items:
+                # when there is no test commands given...
+                self.slack_items.append({
+                    'color': '#e8e8e8',
+                    'title': 'Empty result.',
+                    'text': 'No tests have been executed.',
+                })
             r = requests.post(self.slack_hook_url, data=json.dumps({
                 'text': text,
                 'attachments': self.slack_items,
