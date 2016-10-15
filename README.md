@@ -3,9 +3,15 @@ A simple CI server for us
 
 ## Installation
 
-You need to install this inside a virtualenv where your target project's dependencies are installed.
+You need to install this inside a virtualenv where your target project's
+dependencies are installed.
 
 Simply run `python setup.py install` then.
+
+If you encounter errors while installing `uritemplate` package, then
+manually install `github3.py` package using pip and retry.
+There is a temporary issue due to renaming of `uritemplate` package
+which is not handeld in the stable version of `github3.py` package.
 
 ## Configuration
 
