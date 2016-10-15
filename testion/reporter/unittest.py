@@ -19,7 +19,7 @@ class UnitTestReporter(S3LogUploadMixin, SlackReportMixin, TestReporterBase):
         self.sha = data['sha']
         self.short_sha = self.sha[:7]
 
-    def mark_status(self, state, desc, target_url):
+    async def mark_status(self, state, desc, target_url):
         if not self.remote_repo:
             return
         result = self.remote_repo.create_status(

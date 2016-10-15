@@ -56,6 +56,8 @@ class TestReporterBase:
     def __init__(self, ev_type, data):
         global _test_cond
 
+        self.loop = asyncio.get_event_loop()
+
         self.gh_user = os.environ['GH_USERNAME']
         self.gh_token = os.environ['GH_TOKEN']
 
@@ -108,7 +110,7 @@ class TestReporterBase:
             self.logger.info('---\n{}---'.format(printed_stdout))
         return stdout.strip()
 
-    def _mark_status(self, state, test_result=None, msg=''):
+    async def _mark_status(self, state, test_result=None, msg=''):
         target_url = None
         if state == 'pending':
             desc = msg
@@ -118,9 +120,9 @@ class TestReporterBase:
         else:
             self.logger.error("Invalid status state: {}".format(state))
             return
-        self.mark_status(state, desc, target_url)
+        await self.mark_status(state, desc, target_url)
 
-    def mark_status(self, state, desc, target_url):
+    async def mark_status(self, state, desc, target_url):
         '''
         Report the progress of the currently running test suite.
         If your reporter works in a per-commit basis,
@@ -137,7 +139,7 @@ class TestReporterBase:
         '''
         pass
 
-    def flush_results(self):
+    async def flush_results(self):
         '''
         Make a final report from the stored test results and send it.
         '''
@@ -146,19 +148,19 @@ class TestReporterBase:
     async def run(self, cmd):
         global _test_cond, _num_active_tests
 
-        self._mark_status('pending', msg='Preparing tests...')
+        await self._mark_status('pending', msg='Preparing tests...')
         self.logger.info("Start testing procedure at {} ...".format(datetime.now()))
 
         await _test_cond.acquire()
         while _num_active_tests > 0:
-            _test_cond.wait()
+            await _test_cond.wait()
             if _num_active_tests > 0:
-                self._mark_Status('pending', msg='Waiting for other tests to finish...')
+                await self._mark_Status('pending', msg='Waiting for other tests to finish...')
         _num_active_tests += 1
         _test_cond.release()
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            self._mark_status('pending', msg='Running tests...')
+            await self._mark_status('pending', msg='Running tests...')
 
             os.chdir(tmpdir)
 
@@ -193,20 +195,20 @@ class TestReporterBase:
 
                 test_result = parse_test_result(output)
                 if "Error:" in output:
-                    self._mark_status('error', test_result)
+                    await self._mark_status('error', test_result)
                 elif "FAIL:" in output:
-                    self._mark_status('failure', test_result)
+                    await self._mark_status('failure', test_result)
                 else:
-                    self._mark_status('success', test_result)
+                    await self._mark_status('success', test_result)
                 self.add_result(test_result)
 
             if case_idx == -1:
                 self.logger.info('No test commands executed.')
-                self._mark_status('success', None)
+                await self._mark_status('success', None)
 
             self.local_repo = None
             self.logger.info("Finished at {}\n".format(datetime.now()))
-            self.flush_results()
+            await self.flush_results()
 
         await _test_cond.acquire()
         _num_active_tests -= 1

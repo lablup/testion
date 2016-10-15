@@ -43,8 +43,8 @@ class SlackReportMixin:
             'mrkdwn_in': ['text'],
         })
 
-    def flush_results(self):
-        super().flush_results()
+    async def flush_results(self):
+        await super().flush_results()
 
         if self.slack_hook_url:
             self.logger.info('Flushing test result reports for Slack...')
@@ -85,8 +85,8 @@ class GHIssueCommentMixin:
         desc = '{}: {}'.format(case_name.capitalize(), summary)
         self.comment_items.append(desc)
 
-    def flush_results(self):
-        super().flush_results()
+    async def flush_results(self):
+        await super().flush_results()
 
         if self.repo:
             desc = self.test_type.upper() + ':\n' + '\n'.join(self.comment_items)
@@ -107,11 +107,9 @@ class S3LogUploadMixin:
         super().__init__(*args, **kwargs)
         self.aws_available = 'AWS_ACCESS_KEY_ID' in os.environ
 
-    def flush_results(self):
-        super().flush_results()
+    async def flush_results(self):
+        await super().flush_results()
 
         if self.aws_available:
-            # TODO: wrap with loop.call_soon
-            self.run_command(
-                "aws s3 cp {0} {1}".format(self.log_file, self.s3_dest),
-                verbose=True)
+            cmd = "aws s3 cp {0} {1}".format(self.log_file, self.s3_dest)
+            await self.run_command(cmd, verbose=True)
