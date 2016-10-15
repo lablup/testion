@@ -15,8 +15,7 @@ class UnitTestReporter(S3LogUploadMixin, SlackReportMixin, TestReporterBase):
         if ev_type != 'push':
             raise UnsupportedEventError
         super().__init__(ev_type, data)
-        self.ref = data['ref']
-        self.sha = data['sha']
+        self.sha = data['head']
         self.short_sha = self.sha[:7]
 
     async def mark_status(self, state, desc, target_url):
