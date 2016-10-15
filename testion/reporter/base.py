@@ -1,12 +1,15 @@
+import asyncio
+from asyncio import subprocess
 from collections import namedtuple
 from datetime import datetime
 import logging
 import os
 from pathlib import Path
 import re
-import subprocess
+import tempfile
 
 import github3
+import pygit2
 
 
 TestResult = namedtuple('TestResult', 'num_tests num_success num_fails')
@@ -49,8 +52,8 @@ class TestReporterBase:
 
 
     def __init__(self, ev_type, data):
-        user = os.environ['GH_USERNAME']
-        token = os.environ['GH_TOKEN']
+        self.gh_user = os.environ['GH_USERNAME']
+        self.gh_token = os.environ['GH_TOKEN']
 
         # Set the log file name
         here = Path(__file__).parent
@@ -81,29 +84,18 @@ class TestReporterBase:
         self.logger = logger
 
         # Github & repo objects
-        self.gh = github3.login(user, token)
-        self.repo = self.gh.repository(self.target_user, self.target_repo)
+        self.remote_gh   = github3.login(self.gh_user, self.gh_token)
+        self.remote_repo = self.remote_gh.repository(self.target_user, self.target_repo)
 
     async def run_command(self, cmd, verbose=False):
-        # TODO: change to asyncio.subprocess
-        p = subprocess.run(cmd, shell=True,
-                           stdout=subprocess.PIPE,
-                           stderr=subprocess.STDOUT if verbose else subprocess.PIPE)
-        stdout = p.stdout.decode("utf-8") if p.stdout else ''
-        stderr = p.stderr.decode("utf-8") if p.stderr else ''
+        p = asyncio.create_subprocess_shell(
+            cmd, stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT)
+        stdout, _ = p.communicate()
+        stdout = stdout.decode()
         if verbose:  # stderr is merged with stdout
             self.logger.info(stdout)
-        return stdout, stderr
-
-    def checkout_to_branch(self, name):
-        self.logger.info("Checking out to '{}' branch".format(name))
-        # TODO: change to pygit2 native methods
-        self.run_command("git checkout {}".format(name), verbose=True)
-
-        branch, _ = self.run_command("git branch | grep \* | cut -d ' ' -f2")
-        branch = branch.strip()
-        self.logger.info("On branch '{}'".format(branch))
-        return branch
+        return stdout.strip()
 
     def _mark_status(self, state, test_result=None, preparing=False):
         target_url = None
@@ -147,33 +139,48 @@ class TestReporterBase:
         self._mark_status('pending', preparing=True)
         self.logger.info("Start testing procedure at {} ...".format(datetime.now()))
 
-        # TODO: Clone the repo.
+        with tempfile.TemporaryDirectory() as tmpdir:
 
-        for case_name, ref, cmd in self.test_commands():
+            creds = pygit2.UserPass(self.gh_user, self.gh_token)
+            callbacks = pygit2.RemoteCallbacks(credentials=creds)
+            repo_url = 'https://github.com/{}/{}.git' \
+                       .format(self.target_user, self.target_repo)
+            self.local_repo = pygit2.clone_repository(repo_url, tmpdir,
+                                                      callbacks=callbacks)
 
-            output = None
+            for case_name, ref, cmd in self.test_commands(tmpdir):
 
-            # TODO: Checkout to the given reference
+                self.local_repo.checkout(ref)
+                msg = 'Checked out to {}'.format(self.head.target[:7])
+                if not self.local_repo.head_is_detached:
+                    self.branch = self.local_repo.head.shorthand
+                    msg += " (branch '{}')".format(self.branch)
+                else:
+                    self.branch = None
+                    msg += " (detached)".format(self.branch)
+                self.logger.info(msg)
+                os.chdir(tmpdir)
 
-            self.logger.info('Running tests at {}...'.format(datetime.now()))
-            output, _ = await self.run_command(cmd, verbose=True)
-            self.logger.info('Test finished at {}'.format(datetime.now()))
+                self.logger.info('=== Test started at {} ==='.format(datetime.now()))
+                output = await self.run_command(cmd, verbose=True)
+                self.logger.info('=== Test finished at {} ==='.format(datetime.now()))
 
-            test_result = parse_test_result(output)
-            if "Error:" in output:
-                self._mark_status('error', test_result)
-            elif "FAIL:" in output:
-                self._mark_status('failure', test_result)
-            else:
-                self._mark_status('success', test_result)
-            self.add_result(test_result)
+                test_result = parse_test_result(output)
+                if "Error:" in output:
+                    self._mark_status('error', test_result)
+                elif "FAIL:" in output:
+                    self._mark_status('failure', test_result)
+                else:
+                    self._mark_status('success', test_result)
+                self.add_result(test_result)
 
-        # TODO: Destroy the working coppy and cloned repo.
+            # TODO: handle when there is no test cases
 
+        self.local_repo = None
         self.logger.info("Finished at {}\n".format(datetime.now()))
         self.flush_results()
 
-    def test_commands(self):
+    def test_commands(self, tmpdir):
         '''
         The main method to override.
         It should yield a tuple of the human-readable case name, the refspec that git can fetch, and the command to run a test suite.

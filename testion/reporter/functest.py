@@ -1,6 +1,7 @@
 import contextlib
 import subprocess
 import sys
+import time
 
 from .base import TestReporterBase
 from .mixins import SlackReportMixin, GHIssueCommentMixin, S3LogUploadMixin
@@ -51,28 +52,28 @@ class SeleniumFunctionalTestReporter(
     def __init__(self, ev_type, data):
         super().__init__(ev_type, data)
 
-    def get_test_branches(self):
+    def get_recently_updated_branches(self):
         """
         Find all branches which have commits from yesterday.
         """
-        test_branches = set()
-        # TODO: change to pygit2
-        commits, stderr = self.run_command("git rev-list HEAD --all --after='yesterday'")
-        for commit in commits.split():
-            # TODO: change to pygit2
-            branches, stdout = self.run_command("git branch --contains {} --sort=-committerdate".format(commit))
-            for branch in branches.split():
-                if branch != "*":
-                    test_branches.add(branch)
-                    break
-        return list(test_branches)
+        assert self.local_repo is not None
+        branches = []
 
-    def test_commands(self):
-        test_branches = self.get_test_branches()
+        all_branches = self.local_repo.listall_branches()
+        now = time.time()  # TODO: timezone check?
+        for branch in all_branches:
+            branch_head = self.local_repo.revparse_single(branch)
+            for commit in self.local_repo.walk(branch_head.hex, pygit2.GIT_SORT_TIME):
+                if commit.commit_time >= now - 86400:
+                    branches.append(branch)
+                    break
+        return branches
+
+    def test_commands(self, tmpdir):
+        test_branches = self.get_recently_updated_branches()
         self.logger.info('Branches which have commits yesterday:\n' +
                          '\n'.join(' - {}'.format(name) for name in test_branches))
         for branch in test_branches:
-            self.checkout_to_branch(branch)
             with selenium_server(self.logger):
                 cmd = sys.executable + " manage.py test --noinput functional_tests"
                 yield 'branch {}'.format(branch), branch, cmd

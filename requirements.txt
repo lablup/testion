@@ -2,3 +2,4 @@ uvloop
 aiohttp>=1.0
 requests
 github3.py
+pygit2

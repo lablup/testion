@@ -1,4 +1,5 @@
 import sys
+from pathlib import Path
 
 from ..exceptions import UnsupportedEventError
 from .base import TestReporterBase
@@ -19,9 +20,9 @@ class UnitTestReporter(S3LogUploadMixin, SlackReportMixin, TestReporterBase):
         self.short_sha = self.sha[:7]
 
     def mark_status(self, state, desc, target_url):
-        if not self.repo:
+        if not self.remote_repo:
             return
-        result = self.repo.create_status(
+        result = self.remote_repo.create_status(
             sha=self.sha, state=state,
             description=desc,
             context=self.context,
@@ -34,9 +35,12 @@ class UnitTestReporter(S3LogUploadMixin, SlackReportMixin, TestReporterBase):
             msg = "Error on creating status for commit {}".format(self.short_sha)
             self.logger.error(msg)
 
-    def test_commands(self):
+    def test_commands(self, tmpdir):
         case_name = 'commit {}'.format(self.short_sha)
-        cmd = sys.executable + ' manage.py test --noinput ' \
-              + '`ls -d */ | egrep -v "^functional_tests/"`'
+        dirs = [d.name for d in Path(tmpdir).iterdir() if d.is_dir()
+                                                          and d.name != 'functional_tests'
+                                                          and not d.name.startswith('_')
+                                                          and not d.name.startswith('.')]
+        cmd = sys.executable + ' manage.py test --noinput ' + ' '.join(dirs)
         yield case_name, self.sha, cmd
 
