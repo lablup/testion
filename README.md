@@ -1,7 +1,6 @@
 # testion
 A simple CI server for us
 
-
 ## Installation
 
 You need to install this inside a virtualenv where your target project's
@@ -30,7 +29,9 @@ for recently updated branches (within last 24 hours) with a Selenium sever.
 `python -m testion.server -p <port>` opens an HTTP server accepting webhook
 requests on the given port.
 
-The webhook URL is `http://<hostname>:<port>/webhook`. It expects
-`X-Github-Event: push` header and a JSON-formatted body as [described
-here](https://developer.github.com/v3/activity/events/types/#pushevent) with
-the `POST` method.
+The webhook URL is `http://<hostname>:<port>/webhook?report_type=<type>`
+where type is either `unit` (unit tests) or `slfunc` (functional tests with
+a selenium server).
+It expects `X-Github-Event: push` header and a JSON-formatted body as
+[described here](https://developer.github.com/v3/activity/events/types/#pushevent)
+with the `POST` method.
