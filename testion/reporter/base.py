@@ -144,7 +144,7 @@ class TestReporterBase:
         '''
         pass
 
-    async def run(self, cmd):
+    async def run(self):
         global _test_cond, _num_active_tests
 
         await self._mark_status('pending', msg='Preparing tests...')
