@@ -1,3 +1,4 @@
+import argparse
 import asyncio
 import json
 
@@ -17,8 +18,6 @@ reporter_map = {
 
 
 async def github_webhook(request):
-    user_name = request.match_info['user']
-    repo_name = request.match_info['repo']
     try:
         reporter_cls = reporter_map[request.GET['report_type']]
     except KeyError:
@@ -41,13 +40,17 @@ async def github_webhook(request):
 
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-p', '--port', type=int, default=9092)
+    args = parser.parse_args()
+
     asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
     loop = asyncio.get_event_loop()
     app = web.Application()
-    app.router.add_post('/webhook/{user}/{repo}', github_webhook)
+    app.router.add_post('/webhook', github_webhook)
     try:
-        web.run_app(app, port=9092)
-    except KeyboardInterrupt:
+        web.run_app(app, port=args.port)
+    except (KeyboardInterrupt, SystemExit):
         loop.stop()
     finally:
         loop.close()

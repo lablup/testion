@@ -49,10 +49,6 @@ class TestReporterBase:
     context = 'ci/testion/test'
     test_type = 'test'
 
-    # Github
-    target_user = "lablup"
-    target_repo = "neumann"
-
     def __init__(self, ev_type, data):
         global _test_cond
 
@@ -60,6 +56,9 @@ class TestReporterBase:
 
         self.gh_user = os.environ['GH_USERNAME']
         self.gh_token = os.environ['GH_TOKEN']
+
+        self.target_user = data['repository']['owner']['name']
+        self.target_repo = data['repository']['name']
 
         if _test_cond is None:
             _test_cond = asyncio.Condition()
