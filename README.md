@@ -15,6 +15,17 @@ which is not handeld in the stable version of `github3.py` package.
 
 ## Configuration
 
+Testion requires the following environment variables:
+
+ * `GH_USERNAME` for GitHub login.
+ * `GH_TOKEN` for GitHub login (substitute for passwords)
+
+Additionally, it needs the followings to upload logs to AWS S3:
+
+ * `AWS_ACCESS_KEY_ID`
+ * `AWS_SECRET_ACCESS_KEY`
+ * `AWS_DEFAULT_REGION`
+
 There is no separate configuration file yet, so the behavior of each test
 reporter is fixed.
 
