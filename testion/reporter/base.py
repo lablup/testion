@@ -206,7 +206,7 @@ class TestReporterBase:
                                   | pygit2.GIT_CHECKOUT_REMOVE_UNTRACKED
                     commit = self.local_repo.revparse_single(ref)
                     self.local_repo.checkout_tree(commit.tree, strategy=co_strategy)
-                    msg = 'Checked out to {}'.format(self.local_repo.head.target[:7])
+                    msg = 'Checked out to {}'.format(self.local_repo.head.target.hex[:7])
                     if not self.local_repo.head_is_detached:
                         self.branch = self.local_repo.head.shorthand
                         msg += " (branch '{}')".format(self.branch)
