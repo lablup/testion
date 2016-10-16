@@ -60,7 +60,7 @@ class EntranceLock():
 def parse_test_result(output):
     if output is None:
         return None
-    m = re.search(r'Ran ([0-9]+) tests', output)
+    m = re.search(r'Ran ([0-9]+) tests?', output)
     if not m:
         return None
     num_tests = int(m.group(1))
