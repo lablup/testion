@@ -1,6 +1,7 @@
 import argparse
 import asyncio
 import json
+import traceback
 
 import aiohttp
 from aiohttp import web
@@ -34,9 +35,9 @@ async def github_webhook(request):
         reporter = reporter_cls(ev_type, data)
         await reporter.run()
     except UnsupportedEventError:
-        return web.Response(status=204)
+        return web.Response(status=400, text='Unsupported GitHub event type.')
     except Exception as e:
-        return web.Response(status=500, text='{!r}'.format(e))
+        return web.Response(status=500, text=traceback.format_exc())
     return web.Response(status=204)
 
 
