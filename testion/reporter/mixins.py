@@ -75,9 +75,10 @@ class GHIssueCommentMixin:
         super().__init__(*args, **kwargs)
         self.comment_items = []
         assert self.gh_issue_num is not None
-        if not hasattr(self, 'gh') or self.gh is None:
-            self.gh = github3.login(user, token)
-            self.repo = self.gh.repository(self.target_user, self.target_repo)
+        if not hasattr(self, 'remote_gh') or self.remote_gh is None:
+            self.remote_gh = github3.login(user, token)
+            self.remote_repo = self.remote_gh.repository(self.target_user,
+                                                         self.target_repo)
 
     def add_result(self, case_name, ref, test_result):
         super().add_result(case_name, ref, test_result)
@@ -88,9 +89,9 @@ class GHIssueCommentMixin:
     async def flush_results(self):
         await super().flush_results()
 
-        if self.repo:
+        if self.remote_repo:
             desc = self.test_type.upper() + ':\n' + '\n'.join(self.comment_items)
-            issue = self.repo.issue(issue_num)
+            issue = self.remote_repo.issue(issue_num)
             if issue:  # When there is a corresponding issue
                 cmt = issue.create_comment(desc)
                 if cmt:
