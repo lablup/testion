@@ -204,7 +204,7 @@ class TestReporterBase:
 
                     co_strategy = pygit2.GIT_CHECKOUT_FORCE \
                                   | pygit2.GIT_CHECKOUT_REMOVE_UNTRACKED
-                    self.local_repo.checkout(ref, strategy=co_strategy)
+                    self.local_repo.checkout_tree(ref, strategy=co_strategy)
                     msg = 'Checked out to {}'.format(self.head.target[:7])
                     if not self.local_repo.head_is_detached:
                         self.branch = self.local_repo.head.shorthand
