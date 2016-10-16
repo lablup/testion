@@ -15,8 +15,46 @@ import pygit2
 
 TestResult = namedtuple('TestResult', 'num_tests num_success num_fails')
 
-_test_cond = None
-_num_active_tests = 0
+_entrance_lock = None
+
+
+class EntranceLock():
+
+    def __init__(self, concurrency=1, loop=None):
+        self.concurrency = concurrency
+        self.count = 0
+        self.loop = loop if loop else asyncio.get_event_loop()
+        self.cond = asyncio.Condition(loop=loop)
+
+    class _AContext:
+
+        def __init__(self, elock, pending_cb):
+            self.elock = elock
+            self.pending_cb = pending_cb
+
+        async def __aenter__(self):
+            await self.elock.cond.acquire()
+            while self.elock.count == self.elock.concurrency:
+                await self.elock.conf.wait()
+                if self.elock.count == self.elock.concurrency and self.pending_cb:
+                    await self.pending_cb()
+            self.elock.count += 1
+            self.elock.cond.release()
+
+        async def __aexit__(self, exc_type, exc_value, tb):
+            await self.elock.cond.acquire()
+            self.elock.count -= 1
+            self.elock.cond.notify()
+            self.elock.cond.release()
+
+    def lock(self, pending_cb=None):
+        return _AContext(self, pending_cb)
+
+    @staticmethod
+    def init_global(concurrency, loop=None):
+        global _entrance_lock
+        if _entrance_lock is None:
+            _entrance_lock = EntranceLock(concurrency, loop)
 
 
 def parse_test_result(output):
@@ -145,74 +183,63 @@ class TestReporterBase:
         pass
 
     async def run(self):
-        global _test_cond, _num_active_tests
-
         await self._mark_status('pending', msg='Preparing tests...')
         self.logger.info("Start testing procedure at {} ...".format(datetime.now()))
 
-        await _test_cond.acquire()
-        while _num_active_tests > 0:
-            await _test_cond.wait()
-            if _num_active_tests > 0:
-                await self._mark_Status('pending', msg='Waiting for other tests to finish...')
-        _num_active_tests += 1
-        _test_cond.release()
+        async def pending_cb():
+            await self._mark_Status('pending', msg='Waiting for other tests to finish...')
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            await self._mark_status('pending', msg='Running tests...')
+        async with _entrance_lock.lock(pending_cb):
+            with tempfile.TemporaryDirectory() as tmpdir:
+                await self._mark_status('pending', msg='Running tests...')
 
-            os.chdir(tmpdir)
+                os.chdir(tmpdir)
 
-            # Clone the repository.
-            creds = pygit2.UserPass(self.gh_user, self.gh_token)
-            callbacks = pygit2.RemoteCallbacks(credentials=creds)
-            repo_url = 'https://github.com/{}/{}.git' \
-                       .format(self.target_user, self.target_repo)
-            self.local_repo = pygit2.clone_repository(repo_url, tmpdir,
-                                                      callbacks=callbacks)
+                # Clone the repository.
+                creds = pygit2.UserPass(self.gh_user, self.gh_token)
+                callbacks = pygit2.RemoteCallbacks(credentials=creds)
+                repo_url = 'https://github.com/{}/{}.git' \
+                           .format(self.target_user, self.target_repo)
+                self.local_repo = pygit2.clone_repository(repo_url, tmpdir,
+                                                          callbacks=callbacks)
 
-            case_idx = -1
-            for case_idx, (case_name, ref, cmd) in enumerate(self.test_commands(tmpdir)):
+                case_idx = -1
+                for case_idx, (case_name, ref, cmd) in enumerate(self.test_commands(tmpdir)):
 
-                co_strategy = pygit2.GIT_CHECKOUT_FORCE \
-                              | pygit2.GIT_CHECKOUT_REMOVE_UNTRACKED
-                self.local_repo.checkout(ref, strategy=co_strategy)
-                msg = 'Checked out to {}'.format(self.head.target[:7])
-                if not self.local_repo.head_is_detached:
-                    self.branch = self.local_repo.head.shorthand
-                    msg += " (branch '{}')".format(self.branch)
-                else:
-                    self.branch = None
-                    msg += " (detached)".format(self.branch)
-                self.logger.info(msg)
+                    co_strategy = pygit2.GIT_CHECKOUT_FORCE \
+                                  | pygit2.GIT_CHECKOUT_REMOVE_UNTRACKED
+                    self.local_repo.checkout(ref, strategy=co_strategy)
+                    msg = 'Checked out to {}'.format(self.head.target[:7])
+                    if not self.local_repo.head_is_detached:
+                        self.branch = self.local_repo.head.shorthand
+                        msg += " (branch '{}')".format(self.branch)
+                    else:
+                        self.branch = None
+                        msg += " (detached)".format(self.branch)
+                    self.logger.info(msg)
 
-                self.logger.info('=== Test[{}] started at {} ===' \
-                                 .format(case_idx, datetime.now()))
-                output = await self.run_command(cmd, verbose=True)
-                self.logger.info('=== Test[{}] finished at {} ===' \
-                                 .format(case_idx, datetime.now()))
+                    self.logger.info('=== Test[{}] started at {} ===' \
+                                     .format(case_idx, datetime.now()))
+                    output = await self.run_command(cmd, verbose=True)
+                    self.logger.info('=== Test[{}] finished at {} ===' \
+                                     .format(case_idx, datetime.now()))
 
-                test_result = parse_test_result(output)
-                if "Error:" in output:
-                    await self._mark_status('error', test_result)
-                elif "FAIL:" in output:
-                    await self._mark_status('failure', test_result)
-                else:
-                    await self._mark_status('success', test_result)
-                self.add_result(test_result)
+                    test_result = parse_test_result(output)
+                    if "Error:" in output:
+                        await self._mark_status('error', test_result)
+                    elif "FAIL:" in output:
+                        await self._mark_status('failure', test_result)
+                    else:
+                        await self._mark_status('success', test_result)
+                    self.add_result(test_result)
 
-            if case_idx == -1:
-                self.logger.info('No test commands executed.')
-                await self._mark_status('success', None)
+                if case_idx == -1:
+                    self.logger.info('No test commands executed.')
+                    await self._mark_status('success', None)
 
-            self.local_repo = None
-            self.logger.info("Finished at {}\n".format(datetime.now()))
-            await self.flush_results()
-
-        await _test_cond.acquire()
-        _num_active_tests -= 1
-        _test_cond.notify()
-        _test_cond.release()
+                self.local_repo = None
+                self.logger.info("Finished at {}\n".format(datetime.now()))
+                await self.flush_results()
 
     def test_commands(self, tmpdir):
         '''

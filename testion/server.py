@@ -7,6 +7,7 @@ from aiohttp import web
 import uvloop
 
 from .exceptions import UnsupportedEventError
+from .reporter.base import EntranceLock
 from .reporter.unittest import UnitTestReporter
 from .reporter.functest import SeleniumFunctionalTestReporter
 
@@ -46,6 +47,7 @@ if __name__ == '__main__':
 
     asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
     loop = asyncio.get_event_loop()
+    EntranceLock.init_global(1, loop)
     app = web.Application()
     app.router.add_post('/webhook', github_webhook)
     try:
