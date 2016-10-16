@@ -89,7 +89,6 @@ class TestReporterBase:
     test_type = 'test'
 
     def __init__(self, ev_type, data):
-        global _test_cond
 
         self.loop = asyncio.get_event_loop()
 
@@ -98,9 +97,6 @@ class TestReporterBase:
 
         self.target_user = data['repository']['owner']['name']
         self.target_repo = data['repository']['name']
-
-        if _test_cond is None:
-            _test_cond = asyncio.Condition()
 
         # Set the log file name
         here = Path(__file__).parent
