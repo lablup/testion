@@ -114,16 +114,12 @@ class TestReporterBase:
         self.log_link = "https://s3.ap-northeast-2.amazonaws.com/lablup-testion/{}/{}/{}/{}" \
                         .format(test_date, self.target_user, self.target_repo, log_fname)
 
-        # Set up the logger
-        logger = logging.getLogger(self.test_type)
-        logger.setLevel(logging.DEBUG)
-        handler = logging.FileHandler(self.log_file)
-        handler.setLevel(logging.DEBUG)
-        logger.addHandler(handler)
-        handler = logging.StreamHandler()
-        handler.setLevel(logging.INFO)
-        logger.addHandler(handler)
-        self.logger = logger
+        # Set up the file logger only used for this test run.
+        # (Its output will be propagated to the root logger as well, though.)
+        self.logger = logging.getLogger('testion.TestRun.{}'.format(test_id))
+        self.logfile_handler = logging.FileHandler(self.log_file)
+        self.logfile_handler.setLevel(logging.DEBUG)
+        self.logger.addHandler(self.logfile_handler)
 
         # Github & repo objects
         self.remote_gh   = github3.login(self.gh_user, self.gh_token)
@@ -234,9 +230,10 @@ class TestReporterBase:
                     self.logger.info('No test commands executed.')
                     await self._mark_status('success', None)
 
-                self.local_repo = None
-                self.logger.info("Finished at {}\n".format(datetime.now()))
-                await self.flush_results()
+            self.local_repo = None
+            self.logger.info("Finished at {}\n".format(datetime.now()))
+            self.logger.removeHandler(self.logfile_handler)
+            await self.flush_results()
 
     def test_commands(self, tmpdir):
         '''

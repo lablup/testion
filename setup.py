@@ -35,7 +35,8 @@ setup(
 
     packages=['testion'],
 
-    install_requires=['uvloop', 'aiohttp', 'requests', 'pygit2', 'github3.py'],
+    install_requires=['uvloop', 'aiohttp', 'coloredlogs',
+                      'requests', 'pygit2', 'github3.py'],
     extras_require={
         'dev': [],
         'test': [],

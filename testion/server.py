@@ -1,10 +1,11 @@
 import argparse
 import asyncio
 import json
+import logging
 import traceback
 
-import aiohttp
 from aiohttp import web
+import coloredlogs
 import uvloop
 
 from .exceptions import UnsupportedEventError
@@ -46,6 +47,22 @@ if __name__ == '__main__':
     parser.add_argument('-p', '--port', type=int, default=9092)
     args = parser.parse_args()
 
+    # Set up the root logger that prints all test runs.
+    coloredlogs.install(
+        level='DEBUG',
+        fmt='%(asctime)s %(levelname)s %(name)s %(message)s',
+        field_styles={'levelname': {'color':'black', 'bold':True},
+                      'name': {'color':'black', 'bold':True},
+                      'asctime': {'color':'black'}},
+        level_styles={'info': {'color':'cyan'},
+                      'debug': {'color':'green'},
+                      'warning': {'color':'yellow'},
+                      'error': {'color':'red'},
+                      'critical': {'color':'red', 'bold':True}}
+    )
+    logger = logging.getLogger('testion')
+    logger.info('starting...')
+
     asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
     loop = asyncio.get_event_loop()
     EntranceLock.init_global(1, loop)
@@ -57,4 +74,4 @@ if __name__ == '__main__':
         loop.stop()
     finally:
         loop.close()
-        print('terminated.')
+        logger.info('terminated.')

@@ -1,5 +1,6 @@
 uvloop
 aiohttp>=1.0
+coloredlogs
 requests
 github3.py
 pygit2
