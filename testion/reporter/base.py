@@ -109,7 +109,7 @@ class TestReporterBase:
         log_path = here.parent / 'log' / test_date
         log_path.mkdir(parents=True, exist_ok=True)
         self.log_file = str(log_path / log_fname)
-        self.s3_dest  = "s3://lablup-testion/{}/{}/{}{}" \
+        self.s3_dest  = "s3://lablup-testion/{}/{}/{}/{}" \
                         .format(test_date, self.target_user, self.target_repo, log_fname)
         self.log_link = "https://s3.ap-northeast-2.amazonaws.com/lablup-testion/{}/{}/{}/{}" \
                         .format(test_date, self.target_user, self.target_repo, log_fname)
