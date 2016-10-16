@@ -48,7 +48,7 @@ class EntranceLock():
             self.elock.cond.release()
 
     def lock(self, pending_cb=None):
-        return _AContext(self, pending_cb)
+        return type(self)._AContext(self, pending_cb)
 
     @staticmethod
     def init_global(concurrency, loop=None):
