@@ -165,7 +165,7 @@ class TestReporterBase:
         '''
         pass
 
-    def add_result(self, case_name, test_result):
+    def add_result(self, case_name, ref, test_result):
         '''
         Store the given test result (may be None) in the format(s) you want.
         test_result may be None.
@@ -228,7 +228,7 @@ class TestReporterBase:
                         await self._mark_status('failure', test_result)
                     else:
                         await self._mark_status('success', test_result)
-                    self.add_result(test_result)
+                    self.add_result(case_name, ref, test_result)
 
                 if case_idx == -1:
                     self.logger.info('No test commands executed.')
