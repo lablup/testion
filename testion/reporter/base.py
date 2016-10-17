@@ -64,8 +64,15 @@ def parse_test_result(output):
     if not m:
         return None
     num_tests = int(m.group(1))
-    m = re.search(r'FAILED \(errors=([0-9]+)\)', output)
-    num_fails = int(m.group(1)) if m else 0
+
+    fail_msg = re.search(r'FAILED \((.*)\)', str).group(1)
+    num_fails = 0
+    if fail_msg:
+        # There are two kinds of error: failures and errors.
+        m = re.search(r'failure.=([0-9]+)', fail_msg)
+        num_fails += int(m.group(1)) if m else 0
+        m = re.search(r'error.=([0-9]+)', fail_msg)
+        num_fails += int(m.group(1)) if m else 0
     num_success = num_tests - num_fails
     return TestResult(num_tests, num_success, num_fails)
 
