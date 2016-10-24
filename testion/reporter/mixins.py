@@ -29,7 +29,7 @@ class SlackReportMixin:
         if test_result is None:
             color = 'danger'
         else:
-            success_ratio = test_result.num_success / test_result.num_tests
+            success_ratio = test_result.num_passes / test_result.num_tests
             if success_ratio > 0.999:
                 color = 'good'
             elif success_ratio > 0.9:

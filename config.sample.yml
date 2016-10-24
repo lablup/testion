@@ -1,0 +1,113 @@
+'lablup/testion-test':
+  concurrency: 1
+  reports:
+    'unit-mixed':
+      name: Unit test
+      cls: unit
+      envs:
+        - TESTION_SUCCESS=1
+        - TESTION_FAILURE=1
+        - TESTION_ERROR=1
+      # Branches can be a list of string names or special values such as:
+      #   '!HEAD' => retrieve the latest commit from the push hook data
+      #   '!OUTSTANDING' => all branches updated within last 24 hours
+      branches: '!HEAD'
+      # You may provide a separate "install_cmd" option which runs in prior
+      # to "test_cmd" inside the same temporarily created virtualenv.
+      test_cmd: 'python -m unittest test.py'
+      parser: unittest
+    'pytest-mixed':
+      name: Unit test
+      cls: unit
+      envs:
+        - TESTION_SUCCESS=1
+        - TESTION_FAILURE=1
+        - TESTION_ERROR=1
+      branches: '!HEAD'
+      install_cmd: 'pip install pytest'
+      test_cmd: 'python -m pytest test.py'
+      parser: pytest
+    'unit-success':
+      name: Unit test
+      cls: unit
+      envs:
+        - TESTION_SUCCESS=1
+        - TESTION_FAILURE=0
+        - TESTION_ERROR=0
+      branches: '!HEAD'
+      test_cmd: 'python -m unittest test.py'
+      parser: unittest
+    'pytest-success':
+      name: Unit test
+      cls: unit
+      envs:
+        - TESTION_SUCCESS=1
+        - TESTION_FAILURE=0
+        - TESTION_ERROR=0
+      branches: '!HEAD'
+      install_cmd: 'pip install pytest'
+      test_cmd: 'python -m pytest test.py'
+      parser: pytest
+    'unit-failure':
+      name: Unit test
+      cls: unit
+      envs:
+        - TESTION_SUCCESS=0
+        - TESTION_FAILURE=1
+        - TESTION_ERROR=0
+      branches: '!HEAD'
+      test_cmd: 'python -m unittest test.py'
+      parser: unittest
+    'pytest-failure':
+      name: Unit test
+      cls: unit
+      envs:
+        - TESTION_SUCCESS=0
+        - TESTION_FAILURE=1
+        - TESTION_ERROR=0
+      branches: '!HEAD'
+      install_cmd: 'pip install pytest'
+      test_cmd: 'python -m pytest test.py'
+      parser: pytest
+    'unit-errors':
+      name: Unit test
+      cls: unit
+      envs:
+        - TESTION_SUCCESS=0
+        - TESTION_FAILURE=0
+        - TESTION_ERROR=1
+      branches: '!HEAD'
+      test_cmd: 'python -m unittest test.py'
+      parser: unittest
+    'pytest-errors':
+      name: Unit test
+      cls: unit
+      envs:
+        - TESTION_SUCCESS=0
+        - TESTION_FAILURE=0
+        - TESTION_ERROR=1
+      branches: '!HEAD'
+      install_cmd: 'pip install pytest'
+      test_cmd: 'python -m pytest test.py'
+      parser: pytest
+    'unit-mixed-branch':
+      name: Unit test
+      cls: unit
+      envs:
+        - TESTION_SUCCESS=1
+        - TESTION_FAILURE=1
+        - TESTION_ERROR=1
+      branches: ['master']
+      test_cmd: 'python -m unittest test.py'
+      parser: unittest
+    'pytest-mixed-branch':
+      name: Unit test
+      cls: unit
+      envs:
+        - TESTION_SUCCESS=1
+        - TESTION_FAILURE=1
+        - TESTION_ERROR=1
+      branches: ['master']
+      install_cmd: 'pip install pytest'
+      test_cmd: 'python -m pytest test.py'
+      parser: pytest
