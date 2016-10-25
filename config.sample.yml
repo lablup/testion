@@ -24,7 +24,6 @@
         - TESTION_FAILURE=1
         - TESTION_ERROR=1
       branches: '!HEAD'
-      install_cmd: 'pip install pytest'
       test_cmd: 'python -m pytest test.py'
       parser: pytest
     'unit-success':
@@ -45,7 +44,6 @@
         - TESTION_FAILURE=0
         - TESTION_ERROR=0
       branches: '!HEAD'
-      install_cmd: 'pip install pytest'
       test_cmd: 'python -m pytest test.py'
       parser: pytest
     'unit-failure':
@@ -66,7 +64,6 @@
         - TESTION_FAILURE=1
         - TESTION_ERROR=0
       branches: '!HEAD'
-      install_cmd: 'pip install pytest'
       test_cmd: 'python -m pytest test.py'
       parser: pytest
     'unit-errors':
@@ -87,7 +84,6 @@
         - TESTION_FAILURE=0
         - TESTION_ERROR=1
       branches: '!HEAD'
-      install_cmd: 'pip install pytest'
       test_cmd: 'python -m pytest test.py'
       parser: pytest
     'unit-mixed-branch':
@@ -108,6 +104,5 @@
         - TESTION_FAILURE=1
         - TESTION_ERROR=1
       branches: ['master']
-      install_cmd: 'pip install pytest'
       test_cmd: 'python -m pytest test.py'
       parser: pytest

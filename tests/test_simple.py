@@ -21,9 +21,6 @@ common_data = {
     },
 }
 
-dummy_env = {
-}
-
 
 @pytest.yield_fixture
 def github_mock():
