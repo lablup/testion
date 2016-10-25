@@ -249,7 +249,7 @@ class TestReporterBase:
                 # Run install_cmd if set.
                 if 'install_cmd' in self.report:
                     output = await self.run_command(self.report['install_cmd'],
-                                           venv=venvdir, env=env,
+                                           venv=venvdir, env=env, cwd=wcdir,
                                            verbose=True)
 
                 case_idx = -1
