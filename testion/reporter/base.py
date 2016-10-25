@@ -37,7 +37,7 @@ class EntranceLock():
         async def __aenter__(self):
             await self.elock.cond.acquire()
             while self.elock.count == self.elock.concurrency:
-                await self.elock.conf.wait()
+                await self.elock.cond.wait()
                 if self.elock.count == self.elock.concurrency and self.pending_cb:
                     await self.pending_cb()
             self.elock.count += 1
