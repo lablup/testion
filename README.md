@@ -1,7 +1,6 @@
 # testion
 A simple CI server for us
 
-
 ## Installation
 
 You need to install this inside a virtualenv where your target project's
