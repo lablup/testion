@@ -55,6 +55,7 @@ def env_mock():
 async def test_setup(create_app_and_client):
     app, client = await create_app_and_client()
 
+
 async def test_unittest_mixed(capsys, create_app_and_client,
                               github_mock, requests_mock,
                               aws_mock, env_mock):

@@ -5,3 +5,5 @@ requests
 github3.py
 pygit2
 pyyaml
+pytest
+-e .

@@ -3,9 +3,11 @@ from setuptools import setup, find_packages
 from setuptools.command.test import test as TestCommand
 # To use a consistent encoding
 from codecs import open
-from os import path
+import os
+from pathlib import Path
+import sys
 
-here = path.abspath(path.dirname(__file__))
+here = Path(__file__).resolve().parent
 
 
 class PyTest(TestCommand):
@@ -13,7 +15,6 @@ class PyTest(TestCommand):
 
     def run(self):
         import subprocess
-        import sys
         errno = subprocess.call([sys.executable, '-m', 'pytest', 'tests'])
         raise SystemExit(errno)
 

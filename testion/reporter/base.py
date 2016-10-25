@@ -162,25 +162,25 @@ class TestReporterBase:
         self.remote_repo = self.remote_gh.repository(self.target_user, self.target_repo)
 
     async def run_command(self, cmd, cwd=None, venv=None, env=None, verbose=False):
-        composed_env = {k: v for k, v in os.environ.items()}
+        composed_env = {k: v for k, v in os.environ.items() if k != 'PYTHONHOME'}
         if env:
             composed_env.update(env)
         if venv:
             composed_env['VIRTUAL_ENV'] = venv
-            composed_env['PATH'] = '{}:{}'.format(Path(venv) / 'bin', os.environ['PATH'])
+            composed_env['PATH'] = '{}:{}'.format(Path(venv) / 'bin', composed_env['PATH'])
         p = await asyncio.create_subprocess_shell(
             cmd,
             env=composed_env,
             cwd=cwd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT  # stderr is merged with stdout
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT  # stderr is merged with stdout
         )
         stdout, _ = await p.communicate()
         if stdout is not None:
             stdout = stdout.decode().strip()
         if verbose:
             self.logger.info('>>> {}'.format(cmd))
-            printed_stdout = stdout + '' if stdout is not None and stdout.endswith('\n') else '\n'
+            printed_stdout = stdout + ('' if stdout is not None and stdout.endswith('\n') else '\n')
             self.logger.info('---\n{}---'.format(printed_stdout))
         return stdout
 
@@ -244,9 +244,8 @@ class TestReporterBase:
                     env = odict(e.split('=', 1) for e in self.report['envs'])
                 else:
                     env = None
-                await self.run_command('pip install -U pip wheel', env=env)
                 await self.run_command('python -m venv {}'.format(venvdir), env=env)
-                await self.run_command('pip install -U pip', venv=venvdir, env=env)
+                await self.run_command('pip install -U pip wheel setuptools', venv=venvdir, env=env)
                 await self.run_command('pip install pytest nose', venv=venvdir, env=env)
 
                 # Run install_cmd if set.
