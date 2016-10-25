@@ -246,6 +246,7 @@ class TestReporterBase:
                     env = None
                 await self.run_command('pip install -U pip wheel', env=env)
                 await self.run_command('python -m venv {}'.format(venvdir), env=env)
+                await self.run_command('pip install pytest nose'.format(venvdir), env=env)
 
                 # Run install_cmd if set.
                 if 'install_cmd' in self.report:
