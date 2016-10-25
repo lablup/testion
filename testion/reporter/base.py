@@ -163,7 +163,8 @@ class TestReporterBase:
 
     async def run_command(self, cmd, cwd=None, venv=None, env=None, verbose=False):
         composed_env = {k: v for k, v in os.environ.items()}
-        composed_env.update(env)
+        if env:
+            composed_env.update(env)
         if venv:
             composed_env['VIRTUAL_ENV'] = venv
             composed_env['PATH'] = '{}:{}'.format(Path(venv) / 'bin', os.environ['PATH'])
