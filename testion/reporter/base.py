@@ -14,49 +14,7 @@ import uuid
 import github3
 import pygit2
 
-
 TestResult = namedtuple('TestResult', 'state num_tests num_passes num_fails')
-
-_entrance_lock = None
-
-
-class EntranceLock():
-
-    def __init__(self, concurrency=1, loop=None):
-        self.concurrency = concurrency
-        self.count = 0
-        self.loop = loop if loop else asyncio.get_event_loop()
-        self.cond = asyncio.Condition(loop=loop)
-
-    class _AContext:
-
-        def __init__(self, elock, pending_cb):
-            self.elock = elock
-            self.pending_cb = pending_cb
-
-        async def __aenter__(self):
-            await self.elock.cond.acquire()
-            while self.elock.count == self.elock.concurrency:
-                await self.elock.cond.wait()
-                if self.elock.count == self.elock.concurrency and self.pending_cb:
-                    await self.pending_cb()
-            self.elock.count += 1
-            self.elock.cond.release()
-
-        async def __aexit__(self, exc_type, exc_value, tb):
-            await self.elock.cond.acquire()
-            self.elock.count -= 1
-            self.elock.cond.notify()
-            self.elock.cond.release()
-
-    def lock(self, pending_cb=None):
-        return type(self)._AContext(self, pending_cb)
-
-    @staticmethod
-    def init_global(concurrency, loop=None):
-        global _entrance_lock
-        if _entrance_lock is None:
-            _entrance_lock = EntranceLock(concurrency, loop)
 
 
 def parse_test_result(output, parser='unittest'):
@@ -227,78 +185,74 @@ class TestReporterBase:
         await self._mark_status('pending', msg='Preparing tests...')
         self.logger.info("Start testing procedure at {} ...".format(datetime.now()))
 
-        async def pending_cb():
-            await self._mark_Status('pending', msg='Waiting for other tests to finish...')
+        with tempfile.TemporaryDirectory() as wcdir, tempfile.TemporaryDirectory() as venvdir:
+            await self._mark_status('pending', msg='Running tests...')
 
-        async with _entrance_lock.lock(pending_cb):
-            with tempfile.TemporaryDirectory() as wcdir, tempfile.TemporaryDirectory() as venvdir:
-                await self._mark_status('pending', msg='Running tests...')
+            # Clone the repository.
+            creds = pygit2.UserPass(self.gh_user, self.gh_token)
+            callbacks = pygit2.RemoteCallbacks(credentials=creds)
+            repo_url = self.data['repository']['clone_url']
+            self.local_repo = pygit2.clone_repository(repo_url, wcdir,
+                                                      callbacks=callbacks)
 
-                # Clone the repository.
-                creds = pygit2.UserPass(self.gh_user, self.gh_token)
-                callbacks = pygit2.RemoteCallbacks(credentials=creds)
-                repo_url = self.data['repository']['clone_url']
-                self.local_repo = pygit2.clone_repository(repo_url, wcdir,
-                                                          callbacks=callbacks)
+            # Create a virtualenv.
+            if 'envs' in self.report:
+                env = odict(e.split('=', 1) for e in self.report['envs'])
+            else:
+                env = None
+            await self.run_command('python -m venv {}'.format(venvdir), env=env)
+            await self.run_command('pip install -U pip wheel setuptools', venv=venvdir, env=env)
+            await self.run_command('pip install pytest nose', venv=venvdir, env=env)
 
-                # Create a virtualenv.
-                if 'envs' in self.report:
-                    env = odict(e.split('=', 1) for e in self.report['envs'])
+            # Run install_cmd if set.
+            if 'install_cmd' in self.report:
+                output = await self.run_command(self.report['install_cmd'],
+                                       venv=venvdir, env=env, cwd=wcdir,
+                                       verbose=True)
+
+            case_idx = -1
+            for case_idx, ref in enumerate(self.generate_target_refs()):
+
+                co_strategy = pygit2.GIT_CHECKOUT_FORCE \
+                              | pygit2.GIT_CHECKOUT_REMOVE_UNTRACKED
+                commit = self.local_repo.revparse_single(ref)
+                self.local_repo.checkout_tree(commit.tree, strategy=co_strategy)
+                msg = 'Checked out to {}'.format(self.local_repo.head.target.hex[:7])
+                if not self.local_repo.head_is_detached:
+                    self.branch = self.local_repo.head.shorthand
+                    case_name = "branch '{}'".format(self.branch)
+                    msg += " (branch '{}')".format(self.branch)
                 else:
-                    env = None
-                await self.run_command('python -m venv {}'.format(venvdir), env=env)
-                await self.run_command('pip install -U pip wheel setuptools', venv=venvdir, env=env)
-                await self.run_command('pip install pytest nose', venv=venvdir, env=env)
+                    self.branch = None
+                    case_name = "commit {}".format(commit.hex[:7])
+                    msg += " (detached)"
+                self.logger.info(msg)
 
-                # Run install_cmd if set.
-                if 'install_cmd' in self.report:
-                    output = await self.run_command(self.report['install_cmd'],
-                                           venv=venvdir, env=env, cwd=wcdir,
-                                           verbose=True)
+                with type(self).runner_ctxmgr():
+                    self.logger.info('=== Test[{}] started at {} ===' \
+                                     .format(case_idx, datetime.now()))
+                    output = await self.run_command(self.report['test_cmd'],
+                                                    venv=venvdir, env=env,
+                                                    cwd=wcdir,
+                                                    verbose=True)
+                    self.logger.info('=== Test[{}] finished at {} ===' \
+                                     .format(case_idx, datetime.now()))
 
-                case_idx = -1
-                for case_idx, ref in enumerate(self.generate_target_refs()):
+                test_result = parse_test_result(output, self.report['parser'])
+                if test_result is not None:
+                    await self._mark_status(test_result.state, test_result)
+                else:
+                    await self._mark_status('error', None)
+                self.add_result(case_name, ref, test_result)
 
-                    co_strategy = pygit2.GIT_CHECKOUT_FORCE \
-                                  | pygit2.GIT_CHECKOUT_REMOVE_UNTRACKED
-                    commit = self.local_repo.revparse_single(ref)
-                    self.local_repo.checkout_tree(commit.tree, strategy=co_strategy)
-                    msg = 'Checked out to {}'.format(self.local_repo.head.target.hex[:7])
-                    if not self.local_repo.head_is_detached:
-                        self.branch = self.local_repo.head.shorthand
-                        case_name = "branch '{}'".format(self.branch)
-                        msg += " (branch '{}')".format(self.branch)
-                    else:
-                        self.branch = None
-                        case_name = "commit {}".format(commit.hex[:7])
-                        msg += " (detached)"
-                    self.logger.info(msg)
+            if case_idx == -1:
+                self.logger.info('No test commands executed.')
+                await self._mark_status('success', None)
 
-                    with type(self).runner_ctxmgr():
-                        self.logger.info('=== Test[{}] started at {} ===' \
-                                         .format(case_idx, datetime.now()))
-                        output = await self.run_command(self.report['test_cmd'],
-                                                        venv=venvdir, env=env,
-                                                        cwd=wcdir,
-                                                        verbose=True)
-                        self.logger.info('=== Test[{}] finished at {} ===' \
-                                         .format(case_idx, datetime.now()))
-
-                    test_result = parse_test_result(output, self.report['parser'])
-                    if test_result is not None:
-                        await self._mark_status(test_result.state, test_result)
-                    else:
-                        await self._mark_status('error', None)
-                    self.add_result(case_name, ref, test_result)
-
-                if case_idx == -1:
-                    self.logger.info('No test commands executed.')
-                    await self._mark_status('success', None)
-
-                self.local_repo = None
-                self.logger.info("Finished at {}\n".format(datetime.now()))
-                self.logger.removeHandler(self.logfile_handler)
-                await self.flush_results()
+            self.local_repo = None
+            self.logger.info("Finished at {}\n".format(datetime.now()))
+            self.logger.removeHandler(self.logfile_handler)
+            await self.flush_results()
 
     def get_recently_updated_branches(self):
         """

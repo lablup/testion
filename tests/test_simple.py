@@ -52,15 +52,17 @@ def env_mock():
     with o:
         yield o
 
-async def test_setup(create_app_and_client):
-    app, client = await create_app_and_client()
+async def test_setup(capsys, create_app_and_client):
+    with capsys.disabled():
+        app, client = await create_app_and_client()
+        assert app._job_queue.qsize() == 0
 
 
 async def test_unittest_mixed(capsys, create_app_and_client,
                               github_mock, requests_mock,
                               aws_mock, env_mock):
-    app, client = await create_app_and_client()
     with capsys.disabled():
+        app, client = await create_app_and_client()
         resp = await client.post(
             '/webhook?report=unit-mixed',
             headers={'X-GitHub-Event': 'push'},
@@ -68,6 +70,7 @@ async def test_unittest_mixed(capsys, create_app_and_client,
         )
         assert resp.status == 204
         resp.close()
+        await app._job_queue.join()
         args, kwargs = app._last_reporter.remote_repo.create_status.call_args_list[0]
         assert kwargs['sha'] == common_data['after']
         assert kwargs['state'] == 'pending'
@@ -80,8 +83,8 @@ async def test_unittest_mixed(capsys, create_app_and_client,
 async def test_unittest_success(capsys, create_app_and_client,
                                 github_mock, requests_mock,
                                 aws_mock, env_mock):
-    app, client = await create_app_and_client()
     with capsys.disabled():
+        app, client = await create_app_and_client()
         resp = await client.post(
             '/webhook?report=unit-success',
             headers={'X-GitHub-Event': 'push'},
@@ -89,6 +92,7 @@ async def test_unittest_success(capsys, create_app_and_client,
         )
         assert resp.status == 204
         resp.close()
+        await app._job_queue.join()
         args, kwargs = app._last_reporter.remote_repo.create_status.call_args_list[0]
         assert kwargs['sha'] == common_data['after']
         assert kwargs['state'] == 'pending'
@@ -110,6 +114,7 @@ async def test_unittest_failure(capsys, create_app_and_client,
         )
         assert resp.status == 204
         resp.close()
+        await app._job_queue.join()
         args, kwargs = app._last_reporter.remote_repo.create_status.call_args_list[0]
         assert kwargs['sha'] == common_data['after']
         assert kwargs['state'] == 'pending'
@@ -131,6 +136,7 @@ async def test_unittest_errors(capsys, create_app_and_client,
         )
         assert resp.status == 204
         resp.close()
+        await app._job_queue.join()
         args, kwargs = app._last_reporter.remote_repo.create_status.call_args_list[0]
         assert kwargs['sha'] == common_data['after']
         assert kwargs['state'] == 'pending'
@@ -152,6 +158,7 @@ async def test_pytest_mixed(capsys, create_app_and_client,
         )
         assert resp.status == 204
         resp.close()
+        await app._job_queue.join()
         args, kwargs = app._last_reporter.remote_repo.create_status.call_args_list[0]
         assert kwargs['sha'] == common_data['after']
         assert kwargs['state'] == 'pending'
@@ -173,6 +180,7 @@ async def test_pytest_success(capsys, create_app_and_client,
         )
         assert resp.status == 204
         resp.close()
+        await app._job_queue.join()
         args, kwargs = app._last_reporter.remote_repo.create_status.call_args_list[0]
         assert kwargs['sha'] == common_data['after']
         assert kwargs['state'] == 'pending'
@@ -194,6 +202,7 @@ async def test_pytest_failure(capsys, create_app_and_client,
         )
         assert resp.status == 204
         resp.close()
+        await app._job_queue.join()
         args, kwargs = app._last_reporter.remote_repo.create_status.call_args_list[0]
         assert kwargs['sha'] == common_data['after']
         assert kwargs['state'] == 'pending'
@@ -215,6 +224,7 @@ async def test_pytest_errors(capsys, create_app_and_client,
         )
         assert resp.status == 204
         resp.close()
+        await app._job_queue.join()
         args, kwargs = app._last_reporter.remote_repo.create_status.call_args_list[0]
         assert kwargs['sha'] == common_data['after']
         assert kwargs['state'] == 'pending'
@@ -237,6 +247,7 @@ async def test_unit_mixed_branch(capsys, create_app_and_client,
         )
         assert resp.status == 204
         resp.close()
+        await app._job_queue.join()
         args, kwargs = app._last_reporter.remote_repo.create_status.call_args_list[0]
         assert kwargs['sha'] == common_data['after']
         assert kwargs['state'] == 'pending'
@@ -258,6 +269,7 @@ async def test_pytest_mixed_branch(capsys, create_app_and_client,
         )
         assert resp.status == 204
         resp.close()
+        await app._job_queue.join()
         args, kwargs = app._last_reporter.remote_repo.create_status.call_args_list[0]
         assert kwargs['sha'] == common_data['after']
         assert kwargs['state'] == 'pending'

@@ -11,8 +11,7 @@ import pytest
 import uvloop
 import yaml
 
-from testion.server import github_webhook
-from testion.reporter.base import EntranceLock
+from testion.server import github_webhook, job_loop
 
 
 @contextlib.contextmanager
@@ -67,17 +66,18 @@ def root():
 
 @pytest.yield_fixture
 def create_server(loop, unused_port, root):
-    app = handler = server = None
+    app = handler = server = job_task = None
 
     async def create(debug=False):
-        nonlocal app, handler, server
+        nonlocal app, handler, server, job_task
         app = web.Application(loop=loop)
         app.config = yaml.load((root / 'config.sample.yml').read_text())
         app.config['service_port'] = unused_port
         app.sslctx = None
         app.router.add_post('/webhook', github_webhook)
-        EntranceLock.init_global(1, loop)
+        app._job_queue = asyncio.Queue(loop=loop)
         handler = app.make_handler(debug=debug, keep_alive_on=False)
+        job_task = asyncio.ensure_future(job_loop(loop, app._job_queue))
         server = await loop.create_server(handler,
                                           '127.0.0.1',
                                           app.config['service_port'])
@@ -87,6 +87,7 @@ def create_server(loop, unused_port, root):
 
     async def finish():
         server.close()
+        job_task.cancel()
         await server.wait_closed()
         await app.shutdown()
         await handler.finish_connections()
@@ -116,11 +117,11 @@ class Client:
 
 
 @pytest.yield_fixture
-def create_app_and_client(loop, create_server):
-    client = None
+def create_app_and_client(capsys, loop, create_server):
+    client = app = None
 
     async def maker():
-        nonlocal client
+        nonlocal client, app
         server_params = {}
         client_params = {}
         app, port = await create_server(**server_params)

@@ -2,6 +2,7 @@ import argparse
 import asyncio
 import json
 import logging
+import signal
 import traceback
 from pathlib import Path
 
@@ -11,7 +12,6 @@ import uvloop
 import yaml
 
 from .exceptions import UnsupportedEventError
-from .reporter.base import EntranceLock
 from .reporter.unittest import UnitTestReporter
 from .reporter.functest import SeleniumFunctionalTestReporter
 
@@ -24,7 +24,20 @@ reporter_map = {
 here = Path(__file__).resolve().parent.parent
 
 
+async def job_loop(loop, queue):
+    log = logging.getLogger('testion.jobqueue')
+    while True:
+        try:
+            job = await queue.get()
+            log.info('Fetched a new job and executing it. (current qsize: {})'
+                     .format(queue.qsize()))
+            await job
+            queue.task_done()
+        except asyncio.CancelledError:
+            break
+
 async def github_webhook(request):
+    app = request.app
     try:
         report_key = request.GET['report']
     except KeyError:
@@ -54,17 +67,20 @@ async def github_webhook(request):
 
     try:
         reporter = reporter_cls(config, report, data)
-        request.app._last_reporter = reporter  # for tests
-        if request.GET.get('blocking', '0') == '1':
-            await reporter.run()
-        else:
-            asyncio.ensure_future(reporter.run())
+        app._last_reporter = reporter  # for tests
+        if app._job_queue.qsize() > 0:
+            reporter._mark_status('pending', msg='Waiting for other tests to finish...')
+        await app._job_queue.put(reporter.run())
     except UnsupportedEventError:
         return web.Response(status=400, text='Unsupported GitHub event type.')
     except Exception as e:
         print(traceback.format_exc())
         return web.Response(status=500, text=traceback.format_exc())
     return web.Response(status=204)
+
+def handle_signal(loop, term_ev):
+    if not term_ev.is_set():
+        loop.stop()
 
 
 if __name__ == '__main__':
@@ -89,19 +105,36 @@ if __name__ == '__main__':
                       'critical': {'color':'red', 'bold':True}}
     )
     logger = logging.getLogger('testion')
-    logger.info('starting...')
 
-    asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+    #asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
     loop = asyncio.get_event_loop()
-    EntranceLock.init_global(1, loop)
-    app = web.Application()
+    app = web.Application(loop=loop)
     app.config = config
     app.sslctx = None
     app.router.add_post('/webhook', github_webhook)
+    app._job_queue = asyncio.Queue(loop=loop)
+    term_ev = asyncio.Event(loop=loop)
+    loop.add_signal_handler(signal.SIGINT, handle_signal, loop, term_ev)
+    loop.add_signal_handler(signal.SIGTERM, handle_signal, loop, term_ev)
     try:
-        web.run_app(app, port=config['service_port'])
-    except (KeyboardInterrupt, SystemExit):
-        loop.stop()
+        web_handler = app.make_handler(keep_alive_on=False)
+        job_task = asyncio.ensure_future(job_loop(loop, app._job_queue))
+        server = loop.run_until_complete(
+            loop.create_server(web_handler, '0.0.0.0',
+                               app.config['service_port']))
+        logger.info('Running the server on port {}'
+                    .format(app.config['service_port']))
+        loop.run_forever()
+        # interrupted
+        term_ev.set()
+        async def finish_web():
+            server.close()
+            job_task.cancel()
+            await server.wait_closed()
+            await app.shutdown()
+            await web_handler.finish_connections()
+            await app.cleanup()
+        loop.run_until_complete(finish_web())
     finally:
         loop.close()
         logger.info('terminated.')
