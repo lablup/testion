@@ -106,7 +106,7 @@ if __name__ == '__main__':
     )
     logger = logging.getLogger('testion')
 
-    #asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+    asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
     loop = asyncio.get_event_loop()
     app = web.Application(loop=loop)
     app.config = config
