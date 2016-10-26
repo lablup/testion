@@ -48,7 +48,7 @@ class SlackReportMixin:
 
         if self.slack_hook_url:
             self.logger.info('Flushing test result reports for Slack...')
-            text = '[{}/{}] We have <{}|a new {} report>.' \
+            text = '<https://github.com/{0}/{1}|[{0}/{1}]> We have <{2}|a new {3} report>.' \
                    .format(self.target_user, self.target_repo,
                            self.log_link, self.test_type.replace('_', ' '))
             if not self.slack_items:

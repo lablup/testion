@@ -220,7 +220,7 @@ class TestReporterBase:
                 msg = 'Checked out to {}'.format(self.local_repo.head.target.hex[:7])
                 if not self.local_repo.head_is_detached:
                     self.branch = self.local_repo.head.shorthand
-                    case_name = "branch '{}'".format(self.branch)
+                    case_name = "branch '{}' ({})".format(self.branch, commit.hex[:7])
                     msg += " (branch '{}')".format(self.branch)
                 else:
                     self.branch = None
