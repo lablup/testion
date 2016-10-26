@@ -1,6 +1,8 @@
 'lablup/testion-test':
   concurrency: 1
-  log_path: /tmp/testion-logs
+  log:
+    local_path: /tmp/testion-logs
+    s3_bucket:
   reports:
     'unit-mixed':
       name: Unit test

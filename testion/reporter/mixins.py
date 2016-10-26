@@ -111,6 +111,6 @@ class S3LogUploadMixin:
     async def flush_results(self):
         await super().flush_results()
 
-        if self.aws_available:
+        if self.aws_available and self.s3_dest:
             cmd = "aws s3 cp {0} {1}".format(self.log_file, self.s3_dest)
             await self.run_command(cmd, verbose=True)

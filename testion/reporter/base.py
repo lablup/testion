@@ -100,15 +100,21 @@ class TestReporterBase:
 
         # Set paths to store logs
         if 'log_path' in config:
-            log_path = Path(config['log_path']) / test_date
+            log_path = Path(config['log']['local_path']) / test_date
         else:
             log_path = here.parent.parent / 'logs' / test_date
         log_path.mkdir(parents=True, exist_ok=True)
         self.log_file = str(log_path / log_fname)
-        self.s3_dest  = "s3://lablup-testion/{}/{}/{}/{}" \
-                        .format(test_date, self.target_user, self.target_repo, log_fname)
-        self.log_link = "https://s3.ap-northeast-2.amazonaws.com/lablup-testion/{}/{}/{}/{}" \
-                        .format(test_date, self.target_user, self.target_repo, log_fname)
+        if config['log']['s3_bucket']:
+            self.s3_dest  = 's3://{}/{}/{}/{}/{}' \
+                            .format(config['log']['s3_bucket'], test_date,
+                                    self.target_user, self.target_repo, log_fname)
+            self.log_link = 'https://{}.s3.amazonaws.com/{}/{}/{}/{}' \
+                            .format(config['log']['s3_bucket'], test_date,
+                                    self.target_user, self.target_repo, log_fname)
+        else:
+            self.s3_dest = None
+            self.log_link = '#'
 
         # Set up the file logger only used for this test run.
         # (Its output will be propagated to the root logger as well, though.)
