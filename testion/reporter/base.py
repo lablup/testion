@@ -84,7 +84,6 @@ def parse_test_result(output, parser='unittest'):
                       r'((?P<fails>\d+) failed)?' +
                       r'(, )?' +
                       r'((?P<passes>\d+) passed)?' +
-                      #r'((?P<fails>\d+) failed), ((?P<passes>\d+) passed)' +
                       r') in ([\d.])+ seconds? ====', output)
         if not m:
             return None
@@ -142,7 +141,10 @@ class TestReporterBase:
         log_fname = "{}-{}-{}.txt".format(self.test_type, test_time, test_id)
 
         # Set paths to store logs
-        log_path = here.parent / 'log' / test_date
+        if 'log_path' in config:
+            log_path = Path(config['log_path']) / test_date
+        else:
+            log_path = here.parent.parent / 'logs' / test_date
         log_path.mkdir(parents=True, exist_ok=True)
         self.log_file = str(log_path / log_fname)
         self.s3_dest  = "s3://lablup-testion/{}/{}/{}/{}" \

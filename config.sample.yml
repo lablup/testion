@@ -1,5 +1,6 @@
 'lablup/testion-test':
   concurrency: 1
+  log_path: /tmp/testion-logs
   reports:
     'unit-mixed':
       name: Unit test
